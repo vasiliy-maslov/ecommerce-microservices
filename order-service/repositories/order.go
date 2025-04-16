@@ -30,7 +30,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Or
               VALUES (:id, :user_id, :total, :status, :created_at, :updated_at)`
 	_, err := r.db.NamedExecContext(ctx, query, order)
 	if err != nil {
-		return fmt.Errorf("Error to create order: %v", err)
+		return fmt.Errorf("error to create order: %v", err)
 	}
 
 	return nil
@@ -39,12 +39,12 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Or
 func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*entities.Order, error) {
 	var order entities.Order
 	query := `SELECT * FROM orders WHERE id = $1`
-	err := r.db.GetContext(ctx, &order, query)
+	err := r.db.GetContext(ctx, &order, query, id)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("Order with id %s not found", id)
+		return nil, fmt.Errorf("order with id %s not found", id)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("Error to get order by id: %v", err)
+		return nil, fmt.Errorf("error to get order by id: %v", err)
 	}
 
 	return &order, nil
