@@ -1,9 +1,11 @@
 package main
 
 import (
+	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"log"
+	"net/http"
 )
 
 func main() {
@@ -28,4 +30,19 @@ func main() {
 		log.Fatalf("Failed to create table: %v", err)
 	}
 	log.Println("Table orders created")
+
+	r := chi.NewRouter()
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
+	})
+
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: r,
+	}
+
+	log.Println("Starting server on :8080")
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatalf("Server failed: %v", err)
+	}
 }
