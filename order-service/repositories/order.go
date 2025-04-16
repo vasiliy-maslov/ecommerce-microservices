@@ -2,14 +2,18 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/entities"
 )
 
+// OrderRepository defines methods for interacting with orders in the database.
 type OrderRepository interface {
+	// Create inserts a new order into the database.
 	Create(ctx context.Context, order *entities.Order) error
+	// GetByID retrieves an order by its ID.
 	GetByID(ctx context.Context, id string) (*entities.Order, error)
 }
 
@@ -36,6 +40,9 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*enti
 	var order entities.Order
 	query := `SELECT * FROM orders WHERE id = $1`
 	err := r.db.GetContext(ctx, &order, query)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("Order with id %s not found", id)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("Error to get order by id: %v", err)
 	}
