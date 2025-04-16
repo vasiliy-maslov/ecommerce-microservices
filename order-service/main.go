@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"log"
-	"net/http"
 )
 
 func main() {
@@ -41,8 +46,23 @@ func main() {
 		Handler: r,
 	}
 
-	log.Println("Starting server on :8080")
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	go func() {
+		log.Println("Starting server on :8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, os.Kill)
+	<-sigChan
+	log.Println("Shutting down...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Shutdown failed: %v", err)
 	}
+	log.Println("Server stopped")
 }
