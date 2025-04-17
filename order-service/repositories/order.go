@@ -30,7 +30,7 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Or
               VALUES (:id, :user_id, :total, :status, :created_at, :updated_at)`
 	_, err := r.db.NamedExecContext(ctx, query, order)
 	if err != nil {
-		return fmt.Errorf("error to create order: %v", err)
+		return fmt.Errorf("error to create order: %w", err)
 	}
 
 	return nil
