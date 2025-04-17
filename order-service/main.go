@@ -12,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/handlers"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/repositories"
 )
 
 func main() {
@@ -37,10 +39,15 @@ func main() {
 	}
 	log.Println("Table orders created")
 
+	repo := repositories.NewPostgresOrderRepository(db)
+	handler := handlers.NewOrderHandler(repo)
+
 	r := chi.NewRouter()
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 	})
+	r.Post("/orders", handler.CreateOrder)
+	r.Get("/orders/{id}", handler.GetOrderByID)
 
 	srv := &http.Server{
 		Addr:    ":8080",
