@@ -10,37 +10,33 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/db"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/handlers"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/repositories"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/services"
 )
 
 func main() {
 	log.Println("Order service starting...")
-	db, err := sqlx.Connect("postgres", "host=localhost port=5432 user=postgres password=123456 dbname=orders sslmode=disable")
+
+	dbCfg := db.Config{
+		Host:     "localhost",
+		Port:     "5432",
+		User:     "postgres",
+		Password: "123456",
+		DBName:   "orders",
+		SSLMode:  "disable",
+	}
+
+	dbConn, err := db.Connect(dbCfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
-	log.Println("Connected to PostgreSQL")
+	defer dbConn.Close()
 
-	query := `CREATE TABLE IF NOT EXISTS orders (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    total DOUBLE PRECISION NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
-)`
-	_, err = db.Exec(query)
-	if err != nil {
-		log.Fatalf("Failed to create table: %v", err)
-	}
-	log.Println("Table orders created")
-
-	repo := repositories.NewPostgresOrderRepository(db)
-	handler := handlers.NewOrderHandler(repo)
+	repo := repositories.NewPostgresOrderRepository(dbConn)
+	svc := services.NewOrderService(repo)
+	handler := handlers.NewOrderHandler(svc)
 
 	r := chi.NewRouter()
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

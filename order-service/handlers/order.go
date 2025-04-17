@@ -10,15 +10,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/entities"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/repositories"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/services"
 )
 
 type OrderHandler struct {
-	repo repositories.OrderRepository
+	svc services.OrderService
 }
 
-func NewOrderHandler(repo repositories.OrderRepository) *OrderHandler {
-	return &OrderHandler{repo: repo}
+func NewOrderHandler(svc services.OrderService) *OrderHandler {
+	return &OrderHandler{svc: svc}
 }
 
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +31,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	if err := h.repo.Create(ctx, &order); err != nil {
+	if err := h.svc.CreateOrder(ctx, &order); err != nil {
 		log.Printf("Failed to create order: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -56,7 +56,7 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 
 	ctx := context.Background()
 
-	order, err := h.repo.GetByID(ctx, id)
+	order, err := h.svc.GetOrderByID(ctx, id)
 	if err != nil {
 		log.Printf("Failed to get order by id: %v", err)
 		if errors.Is(err, sql.ErrNoRows) {
