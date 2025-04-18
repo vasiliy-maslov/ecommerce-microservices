@@ -2,3 +2,4 @@
 *.log
 /bin/
 .vscode
+order-service/.env

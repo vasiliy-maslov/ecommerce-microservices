@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/db"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/handlers"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/repositories"
@@ -19,13 +20,34 @@ import (
 func main() {
 	log.Println("Order service starting...")
 
+	err := godotenv.Load("order-service/.env")
+	if err != nil && err != os.ErrNotExist {
+		log.Fatalf("failed to load .env: %v", err)
+	}
+
 	dbCfg := db.Config{
-		Host:     "localhost",
-		Port:     "5432",
-		User:     "postgres",
-		Password: "123456",
-		DBName:   "orders",
-		SSLMode:  "disable",
+		Host:     os.Getenv("DB_HOST"),
+		Port:     os.Getenv("DB_PORT"),
+		User:     os.Getenv("DB_USER"),
+		Password: os.Getenv("DB_PASSWORD"),
+		DBName:   os.Getenv("DB_NAME"),
+		SSLMode:  os.Getenv("DB_SSLMODE"),
+	}
+
+	if dbCfg.Host == "" {
+		log.Fatalf("DB_HOST is required")
+	}
+	if dbCfg.Port == "" {
+		log.Fatalf("DB_PORT is required")
+	}
+	if dbCfg.User == "" {
+		log.Fatalf("DB_USER is required")
+	}
+	if dbCfg.Password == "" {
+		log.Fatalf("DB_PASSWORD is required")
+	}
+	if dbCfg.DBName == "" {
+		log.Fatalf("DB_NAME is required")
 	}
 
 	dbConn, err := db.Connect(dbCfg)
