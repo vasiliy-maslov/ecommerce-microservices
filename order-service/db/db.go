@@ -59,11 +59,11 @@ func applyMigrations(db *sqlx.DB, dbName string) error {
 	}
 
 	err = m.Up()
+	if err == migrate.ErrNoChange {
+		log.Println("No new migrations to apply")
+		return nil
+	}
 	if err != nil {
-		if err != migrate.ErrNoChange {
-			log.Println("No new migrations to apply")
-			return nil
-		}
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 	log.Println("New migrations applied successfully")

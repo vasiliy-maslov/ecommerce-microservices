@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -13,14 +11,17 @@ import (
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/services"
 )
 
+// OrderHandler handles HTTP requests for orders.
 type OrderHandler struct {
 	svc services.OrderService
 }
 
+// NewOrderHandler creates a new OrderHandler.
 func NewOrderHandler(svc services.OrderService) *OrderHandler {
 	return &OrderHandler{svc: svc}
 }
 
+// CreateOrder handles the creation of a new order.
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	var order entities.Order
 
@@ -29,9 +30,13 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx := r.Context()
 
 	if err := h.svc.CreateOrder(ctx, &order); err != nil {
+		if errors.Is(err, services.ErrDuplicateOrderID) {
+			http.Error(w, "order with this ID already exists", http.StatusConflict)
+			return
+		}
 		log.Printf("Failed to create order: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -41,11 +46,13 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(&order); err != nil {
+		log.Printf("Failed to encode response: %v", err)
 		http.Error(w, "invalid json", http.StatusInternalServerError)
 		return
 	}
 }
 
+// GetOrderByID handles retrieving an order by its ID.
 func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
@@ -54,16 +61,16 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := context.Background()
+	ctx := r.Context()
 
 	order, err := h.svc.GetOrderByID(ctx, id)
 	if err != nil {
 		log.Printf("Failed to get order by id: %v", err)
-		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "order not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to get order", http.StatusInternalServerError)
+		return
+	}
+	if order == nil {
+		http.Error(w, "order not found", http.StatusNotFound)
 		return
 	}
 
@@ -71,6 +78,7 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(&order); err != nil {
+		log.Printf("Failed to encode response: %v", err)
 		http.Error(w, "invalid json", http.StatusInternalServerError)
 		return
 	}
