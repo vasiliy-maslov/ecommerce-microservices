@@ -2,7 +2,6 @@ package services_test
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -13,8 +12,9 @@ import (
 )
 
 type mockOrderRepository struct {
-	createFunc  func(ctx context.Context, order *entities.Order) error
-	getByIDFunc func(ctx context.Context, id string) (*entities.Order, error)
+	createFunc     func(ctx context.Context, order *entities.Order) error
+	getByIDFunc    func(ctx context.Context, id string) (*entities.Order, error)
+	existsByIDFunc func(ctx context.Context, id string) (bool, error)
 }
 
 func (m *mockOrderRepository) Create(ctx context.Context, order *entities.Order) error {
@@ -25,80 +25,163 @@ func (m *mockOrderRepository) GetByID(ctx context.Context, id string) (*entities
 	return m.getByIDFunc(ctx, id)
 }
 
-func newTestOrder(total float64, status string) *entities.Order {
-	return &entities.Order{
-		ID:        "550e8400-e29b-41d4-a716-446655440000",
-		UserID:    "123e4567-e89b-12d3-a456-426614174000",
-		Total:     total,
-		Status:    status,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
+func (m *mockOrderRepository) ExistsByID(ctx context.Context, id string) (bool, error) {
+	return m.existsByIDFunc(ctx, id)
 }
 
 func TestOrderService_CreateOrder(t *testing.T) {
-	mockRepo := &mockOrderRepository{
-		createFunc:  func(ctx context.Context, order *entities.Order) error { return nil },
-		getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) { return nil, nil },
+	tests := []struct {
+		name           string
+		order          *entities.Order
+		existsByIDFunc func(ctx context.Context, id string) (bool, error)
+		createFunc     func(ctx context.Context, order *entities.Order) error
+		wantErr        bool
+		wantErrIs      error
+		wantErrMsg     string
+	}{
+		{
+			name: "negative_total",
+			order: &entities.Order{
+				ID:        "550e8400-e29b-41d4-a716-446655440000",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				Total:     -10,
+				Status:    "created",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
+			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			wantErr:        true,
+			wantErrMsg:     "total must be non-negative, got -10.000000",
+		},
+		{
+			name: "empty_status",
+			order: &entities.Order{
+				ID:        "550e8400-e29b-41d4-a716-446655440000",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				Total:     100,
+				Status:    "",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
+			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			wantErr:        true,
+			wantErrMsg:     "status is required",
+		},
+		{
+			name: "duplicate_id",
+			order: &entities.Order{
+				ID:        "550e8400-e29b-41d4-a716-446655440000",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				Total:     100,
+				Status:    "created",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return true, nil },
+			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			wantErr:        true,
+			wantErrIs:      services.ErrDuplicateOrderID,
+			wantErrMsg:     "order with this ID already exists",
+		},
+		{
+			name: "successful_creation",
+			order: &entities.Order{
+				ID:        "550e8400-e29b-41d4-a716-446655440000",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				Total:     100,
+				Status:    "created",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			},
+			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
+			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			wantErr:        false,
+		},
 	}
 
-	svc := services.NewOrderService(mockRepo)
-	ctx := context.Background()
-
-	// Тест 1: total < 0
-	order := newTestOrder(-10, "created")
-	err := svc.CreateOrder(ctx, order)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "total must be non-negative")
-
-	// Тест 2: status пустой
-	order = newTestOrder(100, "")
-	err = svc.CreateOrder(ctx, order)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "status is required")
-
-	// Тест 3: успешное создание
-	order = newTestOrder(100, "created")
-	err = svc.CreateOrder(ctx, order)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockOrderRepository{
+				createFunc:     tt.createFunc,
+				getByIDFunc:    func(ctx context.Context, id string) (*entities.Order, error) { return nil, nil },
+				existsByIDFunc: tt.existsByIDFunc,
+			}
+			svc := services.NewOrderService(mockRepo)
+			err := svc.CreateOrder(context.Background(), tt.order)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.wantErrIs != nil {
+					assert.True(t, errors.Is(err, tt.wantErrIs))
+				}
+				if tt.wantErrMsg != "" {
+					assert.Equal(t, tt.wantErrMsg, err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestOrderService_GetOrderByID(t *testing.T) {
-	// Создай мок-репозиторий
-	mockRepo := &mockOrderRepository{
-		createFunc: func(ctx context.Context, order *entities.Order) error {
-			return nil
+	tests := []struct {
+		name        string
+		id          string
+		getByIDFunc func(ctx context.Context, id string) (*entities.Order, error)
+		expected    *entities.Order
+		wantErr     bool
+	}{
+		{
+			name: "success",
+			id:   "550e8400-e29b-41d4-a716-446655440000",
+			getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
+				return &entities.Order{
+					ID:        "550e8400-e29b-41d4-a716-446655440000",
+					UserID:    "123e4567-e89b-12d3-a456-426614174000",
+					Total:     100.50,
+					Status:    "created",
+					CreatedAt: time.Date(2025, 4, 16, 12, 0, 0, 0, time.UTC),
+					UpdatedAt: time.Date(2025, 4, 16, 12, 0, 0, 0, time.UTC),
+				}, nil
+			},
+			expected: &entities.Order{
+				ID:        "550e8400-e29b-41d4-a716-446655440000",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				Total:     100.50,
+				Status:    "created",
+				CreatedAt: time.Date(2025, 4, 16, 12, 0, 0, 0, time.UTC),
+				UpdatedAt: time.Date(2025, 4, 16, 12, 0, 0, 0, time.UTC),
+			},
+			wantErr: false,
 		},
-		getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
-			return nil, nil
+		{
+			name: "not_found",
+			id:   "999e8400-e29b-41d4-a716-446655440000",
+			getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
+				return nil, nil
+			},
+			expected: nil,
+			wantErr:  false,
 		},
 	}
-	svc := services.NewOrderService(mockRepo)
-	ctx := context.Background()
 
-	// Тест 1: заказ существует
-	mockRepo.getByIDFunc = func(ctx context.Context, id string) (*entities.Order, error) {
-		return &entities.Order{
-			ID:        id,
-			UserID:    "123e4567-e89b-12d3-a456-426614174000",
-			Total:     100,
-			Status:    "created",
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}, nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockOrderRepository{
+				createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+				getByIDFunc:    tt.getByIDFunc,
+				existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
+			}
+			svc := services.NewOrderService(mockRepo)
+			order, err := svc.GetOrderByID(context.Background(), tt.id)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, order)
+			}
+		})
 	}
-	order, err := svc.GetOrderByID(ctx, "some-id")
-	assert.NoError(t, err)
-	assert.NotNil(t, order)
-	assert.Equal(t, order.ID, "some-id")
-
-	// Тест 2: заказ не существует
-	mockRepo.getByIDFunc = func(ctx context.Context, id string) (*entities.Order, error) {
-		return nil, sql.ErrNoRows
-	}
-
-	order, err = svc.GetOrderByID(ctx, "unknown-id")
-	assert.Error(t, err)
-	assert.True(t, errors.Is(err, sql.ErrNoRows))
-	assert.Nil(t, order)
 }
