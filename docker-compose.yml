@@ -1,5 +1,7 @@
+name: orders
+
 services:
-  orders-db:
+  postgres:
     image: postgres:latest
     environment:
       - POSTGRES_USER=postgres
@@ -8,21 +10,32 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - orders-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
-  user-service:
-    image: user-service
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order-service:
     build:
-      context: ./user-service
+      context: ./order-service
       dockerfile: Dockerfile
     ports:
-      - "8081:8081"
+      - "8080:8080"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
+      - APP_PORT=8080
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_NAME=ecommerce
-      - DB_PASS=postgres
+      - DB_NAME=orders
+      - DB_PASSWORD=123456
       - DB_SSLMODE=disable
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

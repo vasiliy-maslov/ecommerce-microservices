@@ -1,4 +1,4 @@
-package entities
+package order
 
 import "time"
 

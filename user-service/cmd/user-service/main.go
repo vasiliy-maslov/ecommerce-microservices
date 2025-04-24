@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user/config"
+	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/config"
 )
 
 func main() {

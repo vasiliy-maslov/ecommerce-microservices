@@ -1,4 +1,4 @@
-package services_test
+package order_test
 
 import (
 	"context"
@@ -7,21 +7,20 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/entities"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/services"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
 )
 
 type mockOrderRepository struct {
-	createFunc     func(ctx context.Context, order *entities.Order) error
-	getByIDFunc    func(ctx context.Context, id string) (*entities.Order, error)
+	createFunc     func(ctx context.Context, order *order.Order) error
+	getByIDFunc    func(ctx context.Context, id string) (*order.Order, error)
 	existsByIDFunc func(ctx context.Context, id string) (bool, error)
 }
 
-func (m *mockOrderRepository) Create(ctx context.Context, order *entities.Order) error {
+func (m *mockOrderRepository) Create(ctx context.Context, order *order.Order) error {
 	return m.createFunc(ctx, order)
 }
 
-func (m *mockOrderRepository) GetByID(ctx context.Context, id string) (*entities.Order, error) {
+func (m *mockOrderRepository) GetByID(ctx context.Context, id string) (*order.Order, error) {
 	return m.getByIDFunc(ctx, id)
 }
 
@@ -32,16 +31,16 @@ func (m *mockOrderRepository) ExistsByID(ctx context.Context, id string) (bool, 
 func TestOrderService_CreateOrder(t *testing.T) {
 	tests := []struct {
 		name           string
-		order          *entities.Order
+		order          *order.Order
 		existsByIDFunc func(ctx context.Context, id string) (bool, error)
-		createFunc     func(ctx context.Context, order *entities.Order) error
+		createFunc     func(ctx context.Context, order *order.Order) error
 		wantErr        bool
 		wantErrIs      error
 		wantErrMsg     string
 	}{
 		{
 			name: "negative_total",
-			order: &entities.Order{
+			order: &order.Order{
 				ID:        "550e8400-e29b-41d4-a716-446655440000",
 				UserID:    "123e4567-e89b-12d3-a456-426614174000",
 				Total:     -10,
@@ -50,13 +49,13 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
-			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			createFunc:     func(ctx context.Context, order *order.Order) error { return nil },
 			wantErr:        true,
 			wantErrMsg:     "total must be non-negative, got -10.000000",
 		},
 		{
 			name: "empty_status",
-			order: &entities.Order{
+			order: &order.Order{
 				ID:        "550e8400-e29b-41d4-a716-446655440000",
 				UserID:    "123e4567-e89b-12d3-a456-426614174000",
 				Total:     100,
@@ -65,13 +64,13 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
-			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			createFunc:     func(ctx context.Context, order *order.Order) error { return nil },
 			wantErr:        true,
 			wantErrMsg:     "status is required",
 		},
 		{
 			name: "duplicate_id",
-			order: &entities.Order{
+			order: &order.Order{
 				ID:        "550e8400-e29b-41d4-a716-446655440000",
 				UserID:    "123e4567-e89b-12d3-a456-426614174000",
 				Total:     100,
@@ -80,14 +79,14 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return true, nil },
-			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			createFunc:     func(ctx context.Context, order *order.Order) error { return nil },
 			wantErr:        true,
-			wantErrIs:      services.ErrDuplicateOrderID,
+			wantErrIs:      order.ErrDuplicateOrderID,
 			wantErrMsg:     "order with this ID already exists",
 		},
 		{
 			name: "successful_creation",
-			order: &entities.Order{
+			order: &order.Order{
 				ID:        "550e8400-e29b-41d4-a716-446655440000",
 				UserID:    "123e4567-e89b-12d3-a456-426614174000",
 				Total:     100,
@@ -96,7 +95,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 				UpdatedAt: time.Now(),
 			},
 			existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
-			createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+			createFunc:     func(ctx context.Context, order *order.Order) error { return nil },
 			wantErr:        false,
 		},
 	}
@@ -105,10 +104,10 @@ func TestOrderService_CreateOrder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockOrderRepository{
 				createFunc:     tt.createFunc,
-				getByIDFunc:    func(ctx context.Context, id string) (*entities.Order, error) { return nil, nil },
+				getByIDFunc:    func(ctx context.Context, id string) (*order.Order, error) { return nil, nil },
 				existsByIDFunc: tt.existsByIDFunc,
 			}
-			svc := services.NewOrderService(mockRepo)
+			svc := order.NewOrderService(mockRepo)
 			err := svc.CreateOrder(context.Background(), tt.order)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -129,15 +128,15 @@ func TestOrderService_GetOrderByID(t *testing.T) {
 	tests := []struct {
 		name        string
 		id          string
-		getByIDFunc func(ctx context.Context, id string) (*entities.Order, error)
-		expected    *entities.Order
+		getByIDFunc func(ctx context.Context, id string) (*order.Order, error)
+		expected    *order.Order
 		wantErr     bool
 	}{
 		{
 			name: "success",
 			id:   "550e8400-e29b-41d4-a716-446655440000",
-			getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
-				return &entities.Order{
+			getByIDFunc: func(ctx context.Context, id string) (*order.Order, error) {
+				return &order.Order{
 					ID:        "550e8400-e29b-41d4-a716-446655440000",
 					UserID:    "123e4567-e89b-12d3-a456-426614174000",
 					Total:     100.50,
@@ -146,7 +145,7 @@ func TestOrderService_GetOrderByID(t *testing.T) {
 					UpdatedAt: time.Date(2025, 4, 16, 12, 0, 0, 0, time.UTC),
 				}, nil
 			},
-			expected: &entities.Order{
+			expected: &order.Order{
 				ID:        "550e8400-e29b-41d4-a716-446655440000",
 				UserID:    "123e4567-e89b-12d3-a456-426614174000",
 				Total:     100.50,
@@ -159,7 +158,7 @@ func TestOrderService_GetOrderByID(t *testing.T) {
 		{
 			name: "not_found",
 			id:   "999e8400-e29b-41d4-a716-446655440000",
-			getByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
+			getByIDFunc: func(ctx context.Context, id string) (*order.Order, error) {
 				return nil, nil
 			},
 			expected: nil,
@@ -170,17 +169,17 @@ func TestOrderService_GetOrderByID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockOrderRepository{
-				createFunc:     func(ctx context.Context, order *entities.Order) error { return nil },
+				createFunc:     func(ctx context.Context, order *order.Order) error { return nil },
 				getByIDFunc:    tt.getByIDFunc,
 				existsByIDFunc: func(ctx context.Context, id string) (bool, error) { return false, nil },
 			}
-			svc := services.NewOrderService(mockRepo)
-			order, err := svc.GetOrderByID(context.Background(), tt.id)
+			svc := order.NewOrderService(mockRepo)
+			ord, err := svc.GetOrderByID(context.Background(), tt.id)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, order)
+				assert.Equal(t, tt.expected, ord)
 			}
 		})
 	}

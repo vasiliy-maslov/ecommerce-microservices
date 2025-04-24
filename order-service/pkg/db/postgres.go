@@ -50,8 +50,10 @@ func applyMigrations(db *sqlx.DB, dbName string) error {
 	if !ok {
 		return fmt.Errorf("failed to get current file path: %w", err)
 	}
+
 	currentDir := filepath.Dir(filename)
-	migrationsPath := filepath.Join(currentDir, "..", "migrations")
+	rootDir := filepath.Dir(filepath.Dir(currentDir))
+	migrationsPath := filepath.Join(rootDir, "migrations")
 
 	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsPath, dbName, driver)
 	if err != nil {

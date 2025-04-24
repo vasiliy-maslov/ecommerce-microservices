@@ -1,4 +1,4 @@
-package repositories
+package order
 
 import (
 	"context"
@@ -6,15 +6,14 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/entities"
 )
 
 // OrderRepository defines methods for interacting with orders in the database.
 type OrderRepository interface {
 	// Create inserts a new order into the database.
-	Create(ctx context.Context, order *entities.Order) error
+	Create(ctx context.Context, order *Order) error
 	// GetByID retrieves an order by its ID.
-	GetByID(ctx context.Context, id string) (*entities.Order, error)
+	GetByID(ctx context.Context, id string) (*Order, error)
 	// ExistsByID checks if an order with the given ID exists.
 	ExistsByID(ctx context.Context, id string) (bool, error)
 }
@@ -29,7 +28,7 @@ func NewPostgresOrderRepository(db *sqlx.DB) *PostgresOrderRepository {
 }
 
 // Create inserts a new order into the PostgreSQL database.
-func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Order) error {
+func (r *PostgresOrderRepository) Create(ctx context.Context, order *Order) error {
 	query := `INSERT INTO orders (id, user_id, total, status, created_at, updated_at)
               VALUES (:id, :user_id, :total, :status, :created_at, :updated_at)`
 	_, err := r.db.NamedExecContext(ctx, query, order)
@@ -41,8 +40,8 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *entities.Or
 }
 
 // GetByID retrieves an order by its ID from the PostgreSQL database.
-func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*entities.Order, error) {
-	var order entities.Order
+func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*Order, error) {
+	var order Order
 	query := `SELECT * FROM orders WHERE id = $1`
 	err := r.db.GetContext(ctx, &order, query, id)
 	if err == sql.ErrNoRows {

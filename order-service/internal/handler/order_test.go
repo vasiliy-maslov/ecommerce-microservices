@@ -1,4 +1,4 @@
-package handlers_test
+package handler
 
 import (
 	"bytes"
@@ -10,21 +10,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/entities"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/handlers"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/services"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
 )
 
 type mockOrderService struct {
-	CreateOrderFunc  func(ctx context.Context, order *entities.Order) error
-	GetOrderByIDFunc func(ctx context.Context, id string) (*entities.Order, error)
+	CreateOrderFunc  func(ctx context.Context, ord *order.Order) error
+	GetOrderByIDFunc func(ctx context.Context, id string) (*order.Order, error)
 }
 
-func (m *mockOrderService) CreateOrder(ctx context.Context, order *entities.Order) error {
+func (m *mockOrderService) CreateOrder(ctx context.Context, order *order.Order) error {
 	return m.CreateOrderFunc(ctx, order)
 }
 
-func (m *mockOrderService) GetOrderByID(ctx context.Context, id string) (*entities.Order, error) {
+func (m *mockOrderService) GetOrderByID(ctx context.Context, id string) (*order.Order, error) {
 	return m.GetOrderByIDFunc(ctx, id)
 }
 
@@ -32,7 +30,7 @@ func TestOrderHandler_CreateOrder(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
-		createOrder    func(ctx context.Context, order *entities.Order) error
+		createOrder    func(ctx context.Context, ord *order.Order) error
 		expectedStatus int
 		expectedBody   string
 	}{
@@ -46,7 +44,7 @@ func TestOrderHandler_CreateOrder(t *testing.T) {
 				"created_at": "2025-04-16T12:00:00Z",
 				"updated_at": "2025-04-16T12:00:00Z"
 			}`,
-			createOrder: func(ctx context.Context, order *entities.Order) error {
+			createOrder: func(ctx context.Context, ord *order.Order) error {
 				return nil
 			},
 			expectedStatus: http.StatusCreated,
@@ -62,8 +60,8 @@ func TestOrderHandler_CreateOrder(t *testing.T) {
 				"created_at": "2025-04-16T12:00:00Z",
 				"updated_at": "2025-04-16T12:00:00Z"
 			}`,
-			createOrder: func(ctx context.Context, order *entities.Order) error {
-				return services.ErrDuplicateOrderID
+			createOrder: func(ctx context.Context, ord *order.Order) error {
+				return order.ErrDuplicateOrderID
 			},
 			expectedStatus: http.StatusConflict,
 			expectedBody:   "order with this ID already exists\n",
@@ -71,7 +69,7 @@ func TestOrderHandler_CreateOrder(t *testing.T) {
 		{
 			name:           "invalid_json",
 			body:           `{invalid json}`,
-			createOrder:    func(ctx context.Context, order *entities.Order) error { return nil },
+			createOrder:    func(ctx context.Context, order *order.Order) error { return nil },
 			expectedStatus: http.StatusBadRequest,
 			expectedBody:   "invalid request body\n",
 		},
@@ -81,12 +79,12 @@ func TestOrderHandler_CreateOrder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := &mockOrderService{
 				CreateOrderFunc: tt.createOrder,
-				GetOrderByIDFunc: func(ctx context.Context, id string) (*entities.Order, error) {
+				GetOrderByIDFunc: func(ctx context.Context, id string) (*order.Order, error) {
 					return nil, nil
 				},
 			}
 
-			handler := handlers.NewOrderHandler(mockSvc)
+			handler := NewOrderHandler(mockSvc)
 			r := chi.NewRouter()
 			r.Post("/orders", handler.CreateOrder)
 
@@ -105,15 +103,15 @@ func TestOrderHandler_GetOrderByID(t *testing.T) {
 	tests := []struct {
 		name           string
 		id             string
-		getOrderByID   func(ctx context.Context, id string) (*entities.Order, error)
+		getOrderByID   func(ctx context.Context, id string) (*order.Order, error)
 		expectedStatus int
 		expectedBody   string
 	}{
 		{
 			name: "success",
 			id:   "550e8400-e29b-41d4-a716-446655440000",
-			getOrderByID: func(ctx context.Context, id string) (*entities.Order, error) {
-				return &entities.Order{
+			getOrderByID: func(ctx context.Context, id string) (*order.Order, error) {
+				return &order.Order{
 					ID:        "550e8400-e29b-41d4-a716-446655440000",
 					UserID:    "123e4567-e89b-12d3-a456-426614174000",
 					Total:     100.50,
@@ -128,7 +126,7 @@ func TestOrderHandler_GetOrderByID(t *testing.T) {
 		{
 			name: "not_found",
 			id:   "999e8400-e29b-41d4-a716-446655440000",
-			getOrderByID: func(ctx context.Context, id string) (*entities.Order, error) {
+			getOrderByID: func(ctx context.Context, id string) (*order.Order, error) {
 				return nil, nil
 			},
 			expectedStatus: http.StatusNotFound,
@@ -137,7 +135,7 @@ func TestOrderHandler_GetOrderByID(t *testing.T) {
 		{
 			name: "empty_id",
 			id:   "", // Пустой id
-			getOrderByID: func(ctx context.Context, id string) (*entities.Order, error) {
+			getOrderByID: func(ctx context.Context, id string) (*order.Order, error) {
 				return nil, nil
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -148,11 +146,11 @@ func TestOrderHandler_GetOrderByID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSvc := &mockOrderService{
-				CreateOrderFunc:  func(ctx context.Context, order *entities.Order) error { return nil },
+				CreateOrderFunc:  func(ctx context.Context, ord *order.Order) error { return nil },
 				GetOrderByIDFunc: tt.getOrderByID,
 			}
 
-			handler := handlers.NewOrderHandler(mockSvc)
+			handler := NewOrderHandler(mockSvc)
 
 			// Создаём запрос
 			req := httptest.NewRequest(http.MethodGet, "/orders/"+tt.id, nil)
