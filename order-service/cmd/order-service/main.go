@@ -22,13 +22,13 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	dbConn, err := db.Connect(cfg.Postgres)
+	dbConn, err := db.New(cfg.Postgres)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer dbConn.Close()
 
-	r := transport.NewRouter(dbConn)
+	r := transport.NewRouter(dbConn.Pool)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.App.Port,

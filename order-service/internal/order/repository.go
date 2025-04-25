@@ -2,10 +2,10 @@ package order
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // OrderRepository defines methods for interacting with orders in the database.
@@ -19,19 +19,19 @@ type OrderRepository interface {
 }
 
 type PostgresOrderRepository struct {
-	db *sqlx.DB
+	db *pgxpool.Pool
 }
 
 // NewPostgresOrderRepository creates a new PostgresOrderRepository.
-func NewPostgresOrderRepository(db *sqlx.DB) *PostgresOrderRepository {
+func NewPostgresOrderRepository(db *pgxpool.Pool) *PostgresOrderRepository {
 	return &PostgresOrderRepository{db: db}
 }
 
 // Create inserts a new order into the PostgreSQL database.
 func (r *PostgresOrderRepository) Create(ctx context.Context, order *Order) error {
 	query := `INSERT INTO orders (id, user_id, total, status, created_at, updated_at)
-              VALUES (:id, :user_id, :total, :status, :created_at, :updated_at)`
-	_, err := r.db.NamedExecContext(ctx, query, order)
+              VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := r.db.Exec(ctx, query, order.ID, order.UserID, order.Total, order.Status, order.CreatedAt, order.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("error to create order: %w", err)
 	}
@@ -42,9 +42,9 @@ func (r *PostgresOrderRepository) Create(ctx context.Context, order *Order) erro
 // GetByID retrieves an order by its ID from the PostgreSQL database.
 func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*Order, error) {
 	var order Order
-	query := `SELECT * FROM orders WHERE id = $1`
-	err := r.db.GetContext(ctx, &order, query, id)
-	if err == sql.ErrNoRows {
+	query := `SELECT id, user_id, total, status, created_at, updated_at FROM orders WHERE id = $1`
+	err := r.db.QueryRow(ctx, query, id).Scan(&order.ID, &order.UserID, &order.Total, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *PostgresOrderRepository) GetByID(ctx context.Context, id string) (*Orde
 func (r *PostgresOrderRepository) ExistsByID(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	query := "SELECT EXISTS (SELECT 1 FROM orders WHERE id = $1)"
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&exists)
+	err := r.db.QueryRow(ctx, query, id).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check order existence: %w", err)
 	}

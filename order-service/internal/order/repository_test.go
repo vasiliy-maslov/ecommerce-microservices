@@ -8,14 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/config"
 )
 
-var db *sqlx.DB
+var db *pgxpool.Pool
 
 func TestMain(m *testing.M) {
 	// Задаём переменные окружения для тестов
@@ -36,29 +35,22 @@ func TestMain(m *testing.M) {
 		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.Password, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
 	log.Printf("Attempting to connect to database with: %s", connStr)
 
-	db, err = sqlx.Connect("postgres", connStr)
+	db, err = pgxpool.New(context.Background(), connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to test database: %v (host=%s, port=%s, user=%s, dbname=%s, sslmode=%s)",
 			err, cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
 	}
 
-	if db == nil {
-		log.Fatalf("Database connection is nil after Connect")
-	}
+	exitCode := m.Run()
 
-	// Проверяем подключение
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
+	db.Close()
 
-	// Запуск тестов
-	os.Exit(m.Run())
+	os.Exit(exitCode)
 }
 
 func setup(t *testing.T) *order.PostgresOrderRepository {
 	// Очистка таблицы перед тестом
-	_, err := db.Exec("TRUNCATE TABLE orders RESTART IDENTITY")
+	_, err := db.Exec(context.Background(), "TRUNCATE TABLE orders RESTART IDENTITY")
 	if err != nil {
 		t.Fatalf("Failed to truncate table: %v", err)
 	}
@@ -68,7 +60,7 @@ func setup(t *testing.T) *order.PostgresOrderRepository {
 
 	// Очистка после теста
 	t.Cleanup(func() {
-		_, err := db.Exec("TRUNCATE TABLE orders RESTART IDENTITY")
+		_, err := db.Exec(context.Background(), "TRUNCATE TABLE orders RESTART IDENTITY")
 		if err != nil {
 			t.Fatalf("Failed to truncate table after test: %v", err)
 		}
@@ -95,7 +87,8 @@ func TestPostgresOrderRepository_Create(t *testing.T) {
 
 	// Проверяем, что заказ сохранился
 	var savedOrder order.Order
-	err = db.GetContext(ctx, &savedOrder, "SELECT * FROM orders WHERE id = $1", ord.ID)
+	err = db.QueryRow(context.Background(), "SELECT id, user_id, total, status, created_at, updated_at FROM orders WHERE id = $1", ord.ID).
+		Scan(&savedOrder.ID, &savedOrder.UserID, &savedOrder.Total, &savedOrder.Status, &savedOrder.CreatedAt, &savedOrder.UpdatedAt)
 	assert.NoError(t, err, "Should be able to retrieve the order")
 	assert.Equal(t, ord.ID, savedOrder.ID, "Order ID should match")
 	assert.Equal(t, ord.UserID, savedOrder.UserID, "UserID should match")

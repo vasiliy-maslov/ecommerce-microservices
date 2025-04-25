@@ -1,61 +1,78 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"log"
-	"path/filepath"
-	"runtime"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 type Config struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host            string
+	Port            string
+	User            string
+	Password        string
+	DBName          string
+	SSLMode         string
+	MaxConns        int32         // Максимальное количество соединений
+	MinConns        int32         // Минимальное количество соединений
+	MaxConnLifetime time.Duration // Максимальное время жизни соединения
+	MigrationsPath  string
 }
 
-func Connect(cfg Config) (*sqlx.DB, error) {
+type Postgres struct {
+	Pool *pgxpool.Pool
+}
+
+func New(cfg Config) (*Postgres, error) {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode)
 
-	db, err := sqlx.Connect("postgres", connStr)
+	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
 
-	log.Println("Connected to PostgreSQL")
+	// Настройка пула соединений (опционально)
+	config.MaxConns = cfg.MaxConns
+	config.MinConns = cfg.MinConns
+	config.MaxConnLifetime = cfg.MaxConnLifetime
 
-	err = applyMigrations(db, cfg.DBName)
+	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
+	}
+
+	err = applyMigrations(dbPool, cfg.MigrationsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	return db, nil
+	log.Println("Connected to PostgreSQL")
+	return &Postgres{Pool: dbPool}, nil
 }
 
-func applyMigrations(db *sqlx.DB, dbName string) error {
-	driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+func (p *Postgres) Close() {
+	p.Pool.Close()
+	log.Println("Database connection closed")
+}
+
+func applyMigrations(dbPool *pgxpool.Pool, migrationsPath string) error {
+	// Преобразуем pgxpool.Pool в sql.DB для миграций
+	sqlDB := stdlib.OpenDBFromPool(dbPool)
+	defer sqlDB.Close()
+
+	// Проверка подключения
+	err := sqlDB.Ping()
 	if err != nil {
-		return fmt.Errorf("failed to create migration driver: %w", err)
+		return fmt.Errorf("failed to ping database for migrations: %w", err)
 	}
 
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("failed to get current file path: %w", err)
-	}
-
-	currentDir := filepath.Dir(filename)
-	rootDir := filepath.Dir(filepath.Dir(currentDir))
-	migrationsPath := filepath.Join(rootDir, "migrations")
-
-	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsPath, dbName, driver)
+	m, err := migrate.New("file://"+migrationsPath, "pgx5://"+dbPool.Config().ConnString())
 	if err != nil {
 		return fmt.Errorf("failed to initialize migration instance: %w", err)
 	}
