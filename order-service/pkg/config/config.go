@@ -34,8 +34,14 @@ func Load(path string) (*Config, error) {
 		if err != nil && err != os.ErrNotExist {
 			return nil, fmt.Errorf("failed to load .env: %w", err)
 		}
+		log.Printf("Loaded .env from path: %s", path)
+	} else {
+		log.Println("No .env path provided, trying default location")
+		err := godotenv.Load()
+		if err != nil && err != os.ErrNotExist {
+			return nil, fmt.Errorf("failed to load .env: %w", err)
+		}
 	}
-
 	cfg := &Config{}
 	cfg.App.Port = os.Getenv("APP_PORT")
 	if cfg.App.Port == "" {
