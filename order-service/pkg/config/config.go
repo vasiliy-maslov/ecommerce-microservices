@@ -1,115 +1,118 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
-type Config struct {
-	App struct {
-		Port string
-	}
-	Postgres struct {
-		Host            string
-		Port            string
-		User            string
-		Password        string
-		DBName          string
-		SSLMode         string
-		MaxConns        int32
-		MinConns        int32
-		MaxConnLifetime time.Duration
-		MigrationsPath  string
-	}
+type AppConfig struct {
+	Port string
 }
 
-func Load(path string) (*Config, error) {
-	if path != "" {
-		err := godotenv.Load(path)
-		if err != nil && err != os.ErrNotExist {
-			return nil, fmt.Errorf("failed to load .env: %w", err)
-		}
-		log.Printf("Loaded .env from path: %s", path)
-	} else {
-		log.Println("No .env path provided, trying default location")
-		err := godotenv.Load()
-		if err != nil && err != os.ErrNotExist {
-			return nil, fmt.Errorf("failed to load .env: %w", err)
-		}
-	}
+type PostgresConfig struct {
+	Host            string
+	Port            string
+	User            string
+	Password        string
+	DBName          string
+	SSLMode         string
+	MaxConns        int32
+	MinConns        int32
+	MaxConnLifetime time.Duration
+	MigrationsPath  string
+}
+
+type Config struct {
+	App      AppConfig
+	Postgres PostgresConfig
+}
+
+func NewConfig(path string) (*Config, error) {
 	cfg := &Config{}
+	var err error
+
+	// Загрузка конфигурации приложения
 	cfg.App.Port = os.Getenv("APP_PORT")
 	if cfg.App.Port == "" {
-		cfg.App.Port = "8080"
+		return nil, errors.New("APP_PORT environment variable not set")
 	}
 
+	// Загрузка конфигурации PostgreSQL
 	cfg.Postgres.Host = os.Getenv("DB_HOST")
 	if cfg.Postgres.Host == "" {
-		log.Fatalf("DB_HOST is required")
+		return nil, errors.New("DB_HOST environment variable not set")
 	}
+
 	cfg.Postgres.Port = os.Getenv("DB_PORT")
 	if cfg.Postgres.Port == "" {
-		log.Fatalf("DB_PORT is required")
+		return nil, errors.New("DB_PORT environment variable not set")
 	}
+
 	cfg.Postgres.User = os.Getenv("DB_USER")
 	if cfg.Postgres.User == "" {
-		log.Fatalf("DB_USER is required")
+		return nil, errors.New("DB_USER environment variable not set")
 	}
+
 	cfg.Postgres.Password = os.Getenv("DB_PASSWORD")
 	if cfg.Postgres.Password == "" {
-		log.Fatalf("DB_PASSWORD is required")
+		return nil, errors.New("DB_PASSWORD environment variable not set") // В реальных проектах пароль может быть опциональным или обрабатываться иначе
 	}
+
 	cfg.Postgres.DBName = os.Getenv("DB_NAME")
 	if cfg.Postgres.DBName == "" {
-		log.Fatalf("DB_NAME is required")
+		return nil, errors.New("DB_NAME environment variable not set")
 	}
+
 	cfg.Postgres.SSLMode = os.Getenv("DB_SSLMODE")
 	if cfg.Postgres.SSLMode == "" {
 		cfg.Postgres.SSLMode = "disable"
 	}
 
-	// Новые параметры для пула соединений
+	// Преобразование MaxConns из строки в int32
 	maxConnsStr := os.Getenv("DB_MAX_CONNS")
-	if maxConnsStr != "" {
-		maxConns, err := strconv.Atoi(maxConnsStr)
-		if err != nil {
-			log.Fatalf("Invalid DB_MAX_CONNS: %v", err)
-		}
-		cfg.Postgres.MaxConns = int32(maxConns)
+	if maxConnsStr == "" {
+		// Если переменная не установлена, используем значение по умолчанию
+		cfg.Postgres.MaxConns = 20
 	} else {
-		cfg.Postgres.MaxConns = 20 // Значение по умолчанию
+		// Если переменная установлена, парсим ее
+		maxConnsInt, err := strconv.ParseInt(maxConnsStr, 10, 32)
+		if err != nil {
+			// Если парсинг не удался, возвращаем ошибку
+			return nil, fmt.Errorf("failed to parse DB_MAX_CONNS '%s': %w", maxConnsStr, err)
+		}
+		// Если парсинг успешен, используем спарсенное значение
+		cfg.Postgres.MaxConns = int32(maxConnsInt)
 	}
 
+	// Аналогично для MinConns
 	minConnsStr := os.Getenv("DB_MIN_CONNS")
-	if minConnsStr != "" {
-		minConns, err := strconv.Atoi(minConnsStr)
-		if err != nil {
-			log.Fatalf("Invalid DB_MIN_CONNS: %v", err)
-		}
-		cfg.Postgres.MinConns = int32(minConns)
+	if minConnsStr == "" {
+		cfg.Postgres.MinConns = 2
 	} else {
-		cfg.Postgres.MinConns = 2 // Значение по умолчанию
+		minConnsInt, err := strconv.ParseInt(minConnsStr, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DB_MIN_CONNS '%s': %w", minConnsStr, err)
+		}
+		cfg.Postgres.MinConns = int32(minConnsInt)
 	}
 
+	// Аналогично для MaxConnLifetime
 	maxConnLifetimeStr := os.Getenv("DB_MAX_CONN_LIFETIME")
-	if maxConnLifetimeStr != "" {
-		maxConnLifetime, err := time.ParseDuration(maxConnLifetimeStr)
-		if err != nil {
-			log.Fatalf("Invalid DB_MAX_CONN_LIFETIME: %v", err)
-		}
-		cfg.Postgres.MaxConnLifetime = maxConnLifetime
+	if maxConnLifetimeStr == "" {
+		cfg.Postgres.MaxConnLifetime = 30 * time.Minute
 	} else {
-		cfg.Postgres.MaxConnLifetime = 30 * time.Minute // Значение по умолчанию
+		cfg.Postgres.MaxConnLifetime, err = time.ParseDuration(maxConnLifetimeStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DB_MAX_CONN_LIFETIME '%s': %w", maxConnLifetimeStr, err)
+		}
 	}
 
 	cfg.Postgres.MigrationsPath = os.Getenv("MIGRATIONS_PATH")
 	if cfg.Postgres.MigrationsPath == "" {
-		cfg.Postgres.MigrationsPath = "migrations" // Значение по умолчанию
+		cfg.Postgres.MigrationsPath = "/app/migrations"
 	}
 
 	return cfg, nil

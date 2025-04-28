@@ -17,7 +17,7 @@ import (
 func main() {
 	log.Println("Order service starting...")
 
-	cfg, err := config.Load(".env")
+	cfg, err := config.NewConfig(".env")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
