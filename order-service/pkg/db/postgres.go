@@ -4,32 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/config"
 )
-
-type Config struct {
-	Host            string
-	Port            string
-	User            string
-	Password        string
-	DBName          string
-	SSLMode         string
-	MaxConns        int32         // Максимальное количество соединений
-	MinConns        int32         // Минимальное количество соединений
-	MaxConnLifetime time.Duration // Максимальное время жизни соединения
-	MigrationsPath  string
-}
 
 type Postgres struct {
 	Pool *pgxpool.Pool
 }
 
-func New(cfg Config) (*Postgres, error) {
+func New(cfg config.PostgresConfig) (*Postgres, error) {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode)
 
 	config, err := pgxpool.ParseConfig(connStr)
@@ -47,7 +35,7 @@ func New(cfg Config) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 
-	err = applyMigrations(dbPool, cfg.MigrationsPath)
+	err = applyMigrations(dbPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
@@ -61,7 +49,7 @@ func (p *Postgres) Close() {
 	log.Println("Database connection closed")
 }
 
-func applyMigrations(dbPool *pgxpool.Pool, migrationsPath string) error {
+func applyMigrations(dbPool *pgxpool.Pool, postgresCfg config.PostgresConfig) error {
 	// Преобразуем pgxpool.Pool в sql.DB для миграций
 	sqlDB := stdlib.OpenDBFromPool(dbPool)
 	defer sqlDB.Close()
@@ -72,7 +60,17 @@ func applyMigrations(dbPool *pgxpool.Pool, migrationsPath string) error {
 		return fmt.Errorf("failed to ping database for migrations: %w", err)
 	}
 
-	m, err := migrate.New("file://"+migrationsPath, "pgx5://"+dbPool.Config().ConnString())
+	poolCfg := dbPool.Config()
+	dsn := fmt.Sprintf("pgx5://%s:%s@%s:%d/%s?sslmode=%s",
+		poolCfg.ConnConfig.User,
+		poolCfg.ConnConfig.Password,
+		poolCfg.ConnConfig.Host,
+		poolCfg.ConnConfig.Port,
+		poolCfg.ConnConfig.Database,
+		postgresCfg.SSLMode,
+	)
+
+	m, err := migrate.New("file://"+postgresCfg.MigrationsPath, dsn)
 	if err != nil {
 		return fmt.Errorf("failed to initialize migration instance: %w", err)
 	}

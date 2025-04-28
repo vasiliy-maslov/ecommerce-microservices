@@ -28,7 +28,7 @@ This project implements a microservices architecture for an e-commerce platform.
 1. Create a `.env` file in the `order-service` directory:
 
    ```bash
-   echo -e "DB_HOST=localhost\nDB_PORT=5432\nDB_USER=postgres\nDB_PASSWORD=123456\nDB_NAME=orders\nDB_SSLMODE=disable" > order-service/.env
+   echo -e "APP_PORT=8080\nDB_HOST=localhost\nDB_PORT=5432\nDB_USER=postgres\nDB_NAME=orders\nDB_PASSWORD=123456\nDB_SSLMODE=disable\nDB_MAX_CONNS=20\nDB_MIN_CONNS=2\nDB_MAX_CONN_LIFETIME=30m\nMIGRATIONS_PATH=migrations" > order-service/.env
    ```
 
 2. Ensure `order-service/.env` is added to `.gitignore`:
@@ -50,7 +50,8 @@ All commands must be executed from the root directory (`ecommerce-microservices`
 2. Run the `order-service`:
 
    ```bash
-   go run order-service/main.go
+   cd order-service
+   go run cmd/order-service/main.go
    ```
 
    Expected output:
@@ -110,7 +111,8 @@ Use Postman or any HTTP client to test the API at `http://localhost:8080`.
 Run unit tests for the `order-service`:
 
 ```bash
-go test -v ./order-service/...
+cd order-service
+go test -v ./...
 ```
 
 Expected output:

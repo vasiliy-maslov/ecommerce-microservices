@@ -26,15 +26,25 @@ func TestMain(m *testing.M) {
 	os.Setenv("DB_SSLMODE", "disable")
 	os.Setenv("APP_PORT", "8080")
 
-	cfg, err := config.Load("") // Пустой путь — используем переменные окружения
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	cfg := config.Config{
+		Postgres: config.PostgresConfig{
+			Host:            os.Getenv("DB_HOST"),
+			Port:            os.Getenv("DB_PORT"),
+			User:            os.Getenv("DB_USER"),
+			Password:        os.Getenv("DB_PASSWORD"),
+			DBName:          os.Getenv("DB_NAME"),
+			SSLMode:         os.Getenv("DB_SSLMODE"),
+			MaxConns:        10,
+			MinConns:        2,
+			MaxConnLifetime: 30 * time.Minute,
+		},
 	}
 
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.Password, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
 	log.Printf("Attempting to connect to database with: %s", connStr)
 
+	var err error
 	db, err = pgxpool.New(context.Background(), connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to test database: %v (host=%s, port=%s, user=%s, dbname=%s, sslmode=%s)",
