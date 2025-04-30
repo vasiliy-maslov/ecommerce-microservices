@@ -1,19 +1,19 @@
-name: orders
+name: ecommerce-microservices
 
 services:
   postgres:
     image: postgres:latest
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=123456
-      - POSTGRES_DB=orders
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -23,23 +23,71 @@ services:
       context: ./order-service
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "${ORDER_SERVICE_PORT}:${APP_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - APP_PORT=8080
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_NAME=orders
-      - DB_PASSWORD=123456
-      - DB_SSLMODE=disable
-      - DB_MAX_CONNS=20
-      - DB_MIN_CONNS=2
-      - DB_MAX_CONN_LIFETIME=30m
-      - MIGRATIONS_PATH=/app/migrations
+      - APP_PORT=${APP_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - DB_MAX_CONNS=${DB_MAX_CONNS}
+      - DB_MIN_CONNS=${DB_MIN_CONNS}
+      - DB_MAX_CONN_LIFETIME=${DB_MAX_CONN_LIFETIME}
+      - MIGRATIONS_PATH=${ORDER_MIGRATIONS_PATH}
+    volumes:
+      - ./order-service/migrations:${ORDER_MIGRATIONS_PATH}
     restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    ports: [ "${USER_SERVICE_PORT}:${APP_PORT}" ]
+    environment:
+      - APP_PORT=${APP_PORT}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - DB_MAX_CONNS=${DB_MAX_CONNS}
+      - DB_MIN_CONNS=${DB_MIN_CONNS}
+      - DB_MAX_CONN_LIFETIME=${DB_MAX_CONN_LIFETIME}
+      - MIGRATIONS_PATH=${USER_MIGRATIONS_PATH} # Используем переменную для пути
+    volumes:
+      - ./user-service/migrations:${USER_MIGRATIONS_PATH}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service-migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  user-service-migrations:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - MIGRATIONS_PATH=${USER_MIGRATIONS_PATH}
+    volumes:
+      - ./user-service/migrations:${USER_MIGRATIONS_PATH}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [ "migrate", "-path", "${USER_MIGRATIONS_PATH}", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}", "up" ]
+    restart: no
 
 volumes:
   postgres-data:

@@ -1,33 +1,33 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/config"
+	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/config"
+	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/db"
 )
 
 func main() {
-	cfg := config.Load("config/config.yaml")
-	fmt.Printf("Loaded config: %+v\n", cfg)
+	log.Println("Starting user-service...")
 
-	r := chi.NewRouter()
-
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	})
-
-	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: r,
+	cfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Println("Server started successful")
-
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("failed starting server: %v", err)
+	dbPool, err := db.New(cfg.Postgres)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
 	}
 
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, syscall.SIGINT, syscall.SIGTERM)
+	<-stopCh
+
+	log.Println("Shutting down...")
+	dbPool.Close()
+	log.Println("User-service stopped gracefully.")
 }

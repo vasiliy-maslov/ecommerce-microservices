@@ -9,15 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/db"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/transport"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/config"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/db"
 )
 
 func main() {
 	log.Println("Order service starting...")
 
-	cfg, err := config.NewConfig(".env")
+	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
