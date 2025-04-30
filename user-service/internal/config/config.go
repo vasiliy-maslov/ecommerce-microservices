@@ -30,8 +30,9 @@ type Config struct {
 	Postgres PostgresConfig
 }
 
-func NewConfig(path string) (*Config, error) {
+func NewConfig() (*Config, error) {
 	cfg := &Config{}
+
 	var err error
 
 	// Загрузка конфигурации приложения

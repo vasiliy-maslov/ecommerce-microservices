@@ -10,7 +10,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/config"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
 )
 
 type Postgres struct {

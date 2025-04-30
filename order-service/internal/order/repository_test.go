@@ -10,8 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
+	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/pkg/config"
 )
 
 var db *pgxpool.Pool
