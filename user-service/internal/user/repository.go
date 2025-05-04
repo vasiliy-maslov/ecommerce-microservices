@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
-	ErrNotFound    = errors.New("user not found")
-	ErrEmailExists = errors.New("email already exists")
+	ErrNotFound              = errors.New("user not found")
+	ErrEmailExists           = errors.New("email already exists")
+	ErrCannotUpdateAdminUser = errors.New("can not update admin")
 )
 
 // Репозиторий для работы с пользователями.
@@ -23,13 +24,13 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	Update(ctx context.Context, user *User) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
 
 type DB interface {
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // Реализация репозитория для работы с БД.
@@ -189,7 +190,7 @@ func (r *repository) Update(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (r *repository) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *repository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	query := `
 		DELETE FROM user_service.users WHERE id = $1
 	`
