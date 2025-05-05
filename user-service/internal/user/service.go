@@ -110,7 +110,7 @@ func (s *service) UpdateUser(ctx context.Context, user *User) error {
 }
 
 func (s *service) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	err := s.repo.DeleteUser(ctx, id)
+	err := s.repo.Delete(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return ErrNotFound
