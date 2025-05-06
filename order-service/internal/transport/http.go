@@ -12,7 +12,7 @@ import (
 func NewRouter(dbConn *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	repo := order.NewPostgresOrderRepository(dbConn)
