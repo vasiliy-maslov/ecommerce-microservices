@@ -13,7 +13,7 @@ import (
 type Service interface {
 	CreateUser(ctx context.Context, user *User) (*User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*User, error)
-	GetByEmail(ctx context.Context, email string) (*User, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	UpdateUser(ctx context.Context, user *User) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 }
@@ -27,14 +27,6 @@ func NewService(repo Repository) Service {
 }
 
 func (s *service) CreateUser(ctx context.Context, user *User) (*User, error) {
-	// 1. Генерируем ID
-	newUuid, err := uuid.NewV4()
-	if err != nil {
-		log.Printf("ERROR: failed to generate uuid: %v", err)
-		return nil, fmt.Errorf("internal error generating user ID: %w", err)
-	}
-	user.ID = newUuid
-
 	if user.PasswordHash == "" {
 		return nil, errors.New("password cannot be empty")
 	}
@@ -45,7 +37,7 @@ func (s *service) CreateUser(ctx context.Context, user *User) (*User, error) {
 	}
 	user.PasswordHash = string(hashPasswordBytes)
 
-	_, err = s.repo.Create(ctx, user)
+	createdID, err := s.repo.Create(ctx, user)
 	if err != nil {
 		if errors.Is(err, ErrEmailExists) {
 			return nil, ErrEmailExists
@@ -53,6 +45,8 @@ func (s *service) CreateUser(ctx context.Context, user *User) (*User, error) {
 		log.Printf("ERROR: failed to create user in repository: %v", err)
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
+
+	user.ID = createdID
 
 	return user, nil
 }
@@ -71,7 +65,7 @@ func (s *service) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) 
 	return user, nil
 }
 
-func (s *service) GetByEmail(ctx context.Context, email string) (*User, error) {
+func (s *service) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {

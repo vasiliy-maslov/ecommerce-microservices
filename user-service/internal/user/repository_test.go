@@ -6,48 +6,87 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/config"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
 
 var testDB *pgxpool.Pool
 
 func TestMain(m *testing.M) {
-	cfg, err := config.NewConfig()
-	if err != nil {
-		log.Fatalf("Failed to lead config for tests: %v", err)
+	// --- Получаем параметры БД для тестов ---
+	// Пытаемся читать из ENV с суффиксом _TEST, иначе используем дефолты для localhost
+	dbHost := os.Getenv("DB_HOST_TEST")
+	if dbHost == "" {
+		dbHost = "localhost"
 	}
+	dbPort := os.Getenv("DB_PORT_TEST")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	dbUser := os.Getenv("DB_USER_TEST")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPassword := os.Getenv("DB_PASSWORD_TEST")
+	if dbPassword == "" {
+		dbPassword = "123456"
+	}
+	dbName := os.Getenv("DB_NAME_TEST")
+	if dbName == "" {
+		dbName = "ecommerce_db"
+	}
+	dbSSLMode := os.Getenv("DB_SSLMODE_TEST")
+	if dbSSLMode == "" {
+		dbSSLMode = "disable"
+	}
+	// --- КОНЕЦ Параметры БД ---
 
+	// --- Установка соединения ---
+	// Формируем строку подключения БЕЗ вызова config.NewConfig()
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s search_path=user_service",
-		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User,
-		cfg.Postgres.Password, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+		dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
+
+	// Используем стандартные настройки пула для тестов
 	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		log.Fatalf("Failed to parse pgxpool config: %v", err)
+		log.Fatalf("TEST SETUP: Failed to parse test db connstr: %v", err)
 	}
+	poolConfig.MaxConns = 5
 
-	testDB, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
+	// Создаем контекст с таймаутом для подключения
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer connectCancel()
+
+	testDB, err = pgxpool.NewWithConfig(connectCtx, poolConfig)
 	if err != nil {
-		log.Fatalf("Failed to connect to test database: %v", err)
+		log.Fatalf("TEST SETUP: Failed to connect to test database (%s:%s): %v", dbHost, dbPort, err)
 	}
 
-	if err = testDB.Ping(context.Background()); err != nil {
-		log.Fatalf("Failed to ping test database: %v", err)
+	// Пингуем с таймаутом
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer pingCancel()
+	if err = testDB.Ping(pingCtx); err != nil {
+		// Закрываем пул перед фатальной ошибкой, если он был создан
+		if testDB != nil {
+			testDB.Close()
+		}
+		log.Fatalf("TEST SETUP: Failed to ping test database: %v", err)
 	}
+	log.Println("TEST SETUP: Test Database connection established.")
+	// --- КОНЕЦ Установки соединения ---
 
-	log.Println("Test Database connection established.")
-
+	// Запуск тестов
 	exitCode := m.Run()
 
+	// Очистка
 	if testDB != nil {
 		testDB.Close()
-		log.Println("Test Database connection closed.")
+		log.Println("TEST SETUP: Test Database connection closed.")
 	}
-
 	os.Exit(exitCode)
 }
 
