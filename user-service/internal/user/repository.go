@@ -24,7 +24,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	Update(ctx context.Context, user *User) error
-	DeleteUser(ctx context.Context, id uuid.UUID) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type DB interface {
@@ -190,7 +190,7 @@ func (r *repository) Update(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (r *repository) DeleteUser(ctx context.Context, id uuid.UUID) error {
+func (r *repository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `
 		DELETE FROM user_service.users WHERE id = $1
 	`

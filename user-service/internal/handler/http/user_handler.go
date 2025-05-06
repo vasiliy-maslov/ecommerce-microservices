@@ -148,7 +148,7 @@ func (h *UserHandler) handleGetUserByEmail(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	foundUser, err := h.service.GetByEmail(r.Context(), emailParam)
+	foundUser, err := h.service.GetUserByEmail(r.Context(), emailParam)
 	if err != nil {
 		log.Printf("ERROR: Failed to get user by email via service: %v", err)
 
