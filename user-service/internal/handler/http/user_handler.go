@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofrs/uuid"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
@@ -37,11 +38,16 @@ type UserResponse struct {
 }
 
 type UserHandler struct {
-	service user.Service
+	service  user.Service
+	validate *validator.Validate
 }
 
 func NewUserHandler(service user.Service) *UserHandler {
-	return &UserHandler{service: service}
+	validate := validator.New()
+	return &UserHandler{
+		service:  service,
+		validate: validate,
+	}
 }
 
 func (h *UserHandler) RegisterRoutes(router chi.Router) {
@@ -63,6 +69,18 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: Failed to decode request bode: %v", err)
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request payload %v", err))
+		return
+	}
+
+	err = h.validate.Struct(requestPayload)
+	if err != nil {
+		validationErrors, ok := err.(validator.ValidationErrors)
+		if ok {
+			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
+		} else {
+			log.Printf("ERROR: Unexpected error type during validation: %T, %v", err, err)
+			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
+		}
 		return
 	}
 
@@ -197,6 +215,18 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ERROR: Failed to decode user: %v", err)
 
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	err = h.validate.Struct(requestPayload)
+	if err != nil {
+		validationErrors, ok := err.(validator.ValidationErrors)
+		if ok {
+			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
+		} else {
+			log.Printf("ERROR: Unexpected error type during validation: %T, %v", err, err)
+			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
+		}
 		return
 	}
 
