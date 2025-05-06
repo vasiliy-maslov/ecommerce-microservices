@@ -20,12 +20,14 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	if err != nil {
 		log.Printf("ERROR: Failed to marshal JSON response: %v", payload)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error":"Failed to marshal JSON response"}`)) // Простой ответ
+		_, _ = w.Write([]byte(`{"error":"Failed to marshal JSON response"}`)) // Простой ответ
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response)
+	if _, err := w.Write(response); err != nil {
+		log.Printf("ERROR: Failed to write JSON response: %v", err)
+	}
 }
 
 func mapErrorToStatusCode(err error) int {
