@@ -3,10 +3,10 @@ package user
 import (
 	"context"
 	"errors"
-	"fmt" // Понадобится для оборачивания ошибок
-	"log" // Для логирования хеширования
+	"fmt"
 
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,7 +32,7 @@ func (s *service) CreateUser(ctx context.Context, user *User) (*User, error) {
 	}
 	hashPasswordBytes, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("ERROR: failed to generate hash password: %v", err)
+		log.Error().Err(err).Msg("Failed to generate hash password")
 		return nil, fmt.Errorf("internal error hashing password: %w", err)
 	}
 	user.PasswordHash = string(hashPasswordBytes)
@@ -42,7 +42,7 @@ func (s *service) CreateUser(ctx context.Context, user *User) (*User, error) {
 		if errors.Is(err, ErrEmailExists) {
 			return nil, ErrEmailExists
 		}
-		log.Printf("ERROR: failed to create user in repository: %v", err)
+		log.Error().Err(err).Type("user_type", &user).Msg("Failed to create user in repository")
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
 
@@ -58,7 +58,7 @@ func (s *service) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) 
 			return nil, ErrNotFound
 		}
 
-		log.Printf("ERROR: failed to get user by id in repository: %v", err)
+		log.Error().Err(err).Str("user_id_received", id.String()).Msg("Failed to get user by id in repository")
 		return nil, fmt.Errorf("failed to get user by id '%s': %w", id, err)
 	}
 
@@ -72,7 +72,7 @@ func (s *service) GetUserByEmail(ctx context.Context, email string) (*User, erro
 			return nil, ErrNotFound
 		}
 
-		log.Printf("ERROR: failed to get user by email in repository: %v", err)
+		log.Error().Err(err).Str("enail_received", email).Msg("Failed to get user by email in repository")
 		return nil, fmt.Errorf("failed to get user by email '%s': %w", email, err)
 	}
 
@@ -83,7 +83,7 @@ func (s *service) UpdateUser(ctx context.Context, user *User) error {
 	if user.PasswordHash != "" {
 		newPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
 		if err != nil {
-			log.Printf("ERROR: failed to generate hash password: %v", err)
+			log.Error().Err(err).Msg("Failed to generate hash password")
 			return fmt.Errorf("failed to generate hash password: %w", err)
 		}
 
@@ -96,7 +96,7 @@ func (s *service) UpdateUser(ctx context.Context, user *User) error {
 			return ErrEmailExists
 		}
 
-		log.Printf("ERROR: failed to update user: %v", err)
+		log.Error().Err(err).Type("update_user_type", &user).Msg("Failed to update user")
 		return fmt.Errorf("failed to update user by id '%s': %w", user.ID.String(), err)
 	}
 
@@ -110,7 +110,7 @@ func (s *service) DeleteUser(ctx context.Context, id uuid.UUID) error {
 			return ErrNotFound
 		}
 
-		log.Printf("ERROR: failed to delete user: %v", err)
+		log.Error().Err(err).Str("delete_user_id_received", id.String()).Msg("Failed to delete user")
 		return fmt.Errorf("failed to delete user by id '%s': %w", id, err)
 	}
 

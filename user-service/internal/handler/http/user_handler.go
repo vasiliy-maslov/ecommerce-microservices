@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofrs/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
 
@@ -67,7 +67,7 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	err := decoder.Decode(&requestPayload)
 	if err != nil {
-		log.Printf("ERROR: Failed to decode request bode: %v", err)
+		log.Error().Err(err).Type("request_payload", requestPayload).Msg("Failed to decode request body")
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request payload %v", err))
 		return
 	}
@@ -78,7 +78,7 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
 		} else {
-			log.Printf("ERROR: Unexpected error type during validation: %T, %v", err, err)
+			log.Error().Err(err).Type("validation_error_type", err).Msg("Unexpected error type during validation")
 			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
 		}
 		return
@@ -93,7 +93,7 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	createdUser, err := h.service.CreateUser(r.Context(), &domainUser)
 	if err != nil {
-		log.Printf("ERROR: Failed to create user via service: %v", err)
+		log.Error().Err(err).Msg("ERROR: Failed to create user via service")
 
 		statusCode := mapErrorToStatusCode(err)
 
@@ -125,13 +125,14 @@ func (h *UserHandler) handleGetUserByID(w http.ResponseWriter, r *http.Request) 
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid id parameter: %v", err))
+		log.Error().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
+		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
 	}
 
 	foundUser, err := h.service.GetUserByID(r.Context(), userID)
 	if err != nil {
-		log.Printf("ERROR: Failed to get user by id via service: %v", err)
+		log.Error().Err(err).Msg("Failed to get user by id via service")
 
 		statusCode := mapErrorToStatusCode(err)
 
@@ -162,13 +163,14 @@ func (h *UserHandler) handleGetUserByID(w http.ResponseWriter, r *http.Request) 
 func (h *UserHandler) handleGetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	emailParam := chi.URLParam(r, "email")
 	if emailParam == "" {
+		log.Error().Msg("Failed to parse email from param")
 		respondWithError(w, http.StatusBadRequest, "Email parameter cannot be empty")
 		return
 	}
 
 	foundUser, err := h.service.GetUserByEmail(r.Context(), emailParam)
 	if err != nil {
-		log.Printf("ERROR: Failed to get user by email via service: %v", err)
+		log.Error().Err(err).Msg("Failed to get user by email via service")
 
 		statusCode := mapErrorToStatusCode(err)
 
@@ -200,7 +202,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Printf("ERROR: Failed to parse id from param: %v", err)
+		log.Error().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
@@ -212,7 +214,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&requestPayload)
 	if err != nil {
-		log.Printf("ERROR: Failed to decode user: %v", err)
+		log.Error().Err(err).Type("request_payload", requestPayload).Msg("Failed to decode user")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
@@ -224,7 +226,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		if ok {
 			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
 		} else {
-			log.Printf("ERROR: Unexpected error type during validation: %T, %v", err, err)
+			log.Error().Err(err).Type("validation_error_type", err).Msg("Unexpected error type during validation")
 			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
 		}
 		return
@@ -243,7 +245,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.UpdateUser(r.Context(), &domainUser)
 	if err != nil {
-		log.Printf("ERROR: Failed to update user via service: %v", err)
+		log.Error().Err(err).Msg("Failed to update user via service")
 
 		statusCode := mapErrorToStatusCode(err)
 
@@ -268,7 +270,7 @@ func (h *UserHandler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Printf("ERROR: Failed to parse id from param: %v", err)
+		log.Error().Err(err).Str("id_param", idParam).Msg("Failed to parse id parameter from URL")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
@@ -276,7 +278,7 @@ func (h *UserHandler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	err = h.service.DeleteUser(r.Context(), userID)
 	if err != nil {
-		log.Printf("ERROR: Failed to delete user via service: %v", err)
+		log.Error().Err(err).Msg("Failed to delete user via service")
 
 		statusCode := mapErrorToStatusCode(err)
 

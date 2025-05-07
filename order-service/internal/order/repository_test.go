@@ -3,12 +3,12 @@ package order_test
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
@@ -42,13 +42,19 @@ func TestMain(m *testing.M) {
 
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.Password, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
-	log.Printf("Attempting to connect to database with: %s", connStr)
+	log.Info().Msgf("Attempting to connect to database with: %s", connStr)
 
 	var err error
 	db, err = pgxpool.New(context.Background(), connStr)
 	if err != nil {
-		log.Fatalf("Failed to connect to test database: %v (host=%s, port=%s, user=%s, dbname=%s, sslmode=%s)",
-			err, cfg.Postgres.Host, cfg.Postgres.Port, cfg.Postgres.User, cfg.Postgres.DBName, cfg.Postgres.SSLMode)
+		log.Fatal().
+			Err(err).
+			Str("host", cfg.Postgres.Host).
+			Str("port", cfg.Postgres.Port).
+			Str("user", cfg.Postgres.User).
+			Str("dbname", cfg.Postgres.DBName).
+			Str("sslmode", cfg.Postgres.SSLMode).
+			Msg("Failed to connect to test database")
 	}
 
 	exitCode := m.Run()

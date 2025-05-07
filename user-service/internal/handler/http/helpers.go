@@ -1,15 +1,14 @@
 package http
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
 
@@ -22,15 +21,17 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	response, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal JSON response: %v", payload)
+		log.Error().Err(err).Type("payload_type", payload).Msg("ERROR: Failed to marshal JSON response")
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error":"Failed to marshal JSON response"}`)) // Простой ответ
+		if _, writeErr := w.Write([]byte(`{"error":"Failed to marshal JSON response"}`)); writeErr != nil {
+			log.Warn().Err(writeErr).Msg("Failed to write fallback error response")
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if _, err := w.Write(response); err != nil {
-		log.Printf("ERROR: Failed to write JSON response: %v", err)
+		log.Error().Err(err).Int("status_code", code).Msg("Failed to write JSON response")
 	}
 }
 
