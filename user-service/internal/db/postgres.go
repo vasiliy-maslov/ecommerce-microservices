@@ -3,9 +3,9 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/config"
 )
 
@@ -35,13 +35,13 @@ func New(cfg config.PostgresConfig) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to ping db: %w", err)
 	}
 
-	log.Println("Connected to PostgreSQL (user_service schema)")
+	log.Info().Msg("Connected to PostgreSQL (user_service schema)")
 	return &Postgres{Pool: dbPool}, nil
 }
 
 func (p *Postgres) Close() {
 	if p.Pool != nil {
 		p.Pool.Close()
-		log.Println("Database connection closed")
+		log.Info().Msg("Database connection closed")
 	}
 }

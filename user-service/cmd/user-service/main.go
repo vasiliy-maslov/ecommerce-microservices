@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/config"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/db"
 	userHttp "github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/handler/http"
@@ -19,17 +20,22 @@ import (
 )
 
 func main() {
-	log.Println("Starting user-service...")
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	log.Logger = log.With().Str("service", "user-service").Logger()
+
+	log.Info().Msg("Starting user-service...")
 
 	cfg, err := config.NewConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatal().Err(err).Msgf("Failed to load config: %v", err)
 	}
-
+	log.Debug().Interface("config_loaded", cfg).Msg("Configuration loaded")
 	dbPool, err := db.New(cfg.Postgres)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatal().Err(err).Msgf("failed to connect to database: %v", err)
 	}
+	log.Info().Msg("Successfully conected to database")
 
 	userRepository := userService.NewRepository(dbPool.Pool)
 	userSvc := userService.NewService(userRepository)
@@ -54,7 +60,7 @@ func main() {
 	go func() {
 		log.Printf("Starting HTTP server on port %s", cfg.App.Port)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Could not listen on %s: %v\n", cfg.App.Port, err)
+			log.Fatal().Err(err).Msgf("Could not listen on %s: %v\n", cfg.App.Port, err)
 		}
 	}()
 
@@ -62,18 +68,18 @@ func main() {
 	signal.Notify(stopCh, syscall.SIGINT, syscall.SIGTERM)
 	<-stopCh
 
-	log.Println("Shutting down server...")
+	log.Info().Msg("Shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server Shutdown Failed:%+v", err)
+		log.Fatal().Err(err).Msgf("Server Shutdown Failed:%+v", err)
 	}
 
 	dbPool.Close()
 
-	log.Println("HTTP server stopped.")
+	log.Info().Msg("HTTP server stopped.")
 
-	log.Println("User-service stopped gracefully.")
+	log.Info().Msg("User-service stopped gracefully.")
 }

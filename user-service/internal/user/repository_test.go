@@ -3,13 +3,13 @@ package user_test
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
@@ -53,7 +53,14 @@ func TestMain(m *testing.M) {
 	// Используем стандартные настройки пула для тестов
 	poolConfig, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		log.Fatalf("TEST SETUP: Failed to parse test db connstr: %v", err)
+		log.Fatal().
+			Err(err).
+			Str("host", dbHost).
+			Str("port", dbPort).
+			Str("user", dbUser).
+			Str("dbname", dbName).
+			Str("sslmode", dbSSLMode).
+			Msg("Failed to connect to test database")
 	}
 	poolConfig.MaxConns = 5
 
@@ -63,7 +70,7 @@ func TestMain(m *testing.M) {
 
 	testDB, err = pgxpool.NewWithConfig(connectCtx, poolConfig)
 	if err != nil {
-		log.Fatalf("TEST SETUP: Failed to connect to test database (%s:%s): %v", dbHost, dbPort, err)
+		log.Fatal().Err(err).Str("db_host", dbHost).Str("db_port", dbPort).Msg("Failed to connect to test database")
 	}
 
 	// Пингуем с таймаутом
@@ -74,9 +81,9 @@ func TestMain(m *testing.M) {
 		if testDB != nil {
 			testDB.Close()
 		}
-		log.Fatalf("TEST SETUP: Failed to ping test database: %v", err)
+		log.Fatal().Err(err).Msg("Failed to ping test database")
 	}
-	log.Println("TEST SETUP: Test Database connection established.")
+	log.Info().Msg("Test Database connection established.")
 	// --- КОНЕЦ Установки соединения ---
 
 	// Запуск тестов
@@ -85,7 +92,7 @@ func TestMain(m *testing.M) {
 	// Очистка
 	if testDB != nil {
 		testDB.Close()
-		log.Println("TEST SETUP: Test Database connection closed.")
+		log.Info().Msg("TEST SETUP: Test Database connection closed.")
 	}
 	os.Exit(exitCode)
 }

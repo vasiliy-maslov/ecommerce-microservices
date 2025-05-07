@@ -3,10 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/order"
 )
 
@@ -36,7 +36,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "order with this ID already exists", http.StatusConflict)
 			return
 		}
-		log.Printf("Failed to create order: %v", err)
+		log.Info().Msgf("Failed to create order: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -45,7 +45,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(&o); err != nil {
-		log.Printf("Failed to encode response: %v", err)
+		log.Info().Msgf("Failed to encode response: %v", err)
 		http.Error(w, "invalid json", http.StatusInternalServerError)
 		return
 	}
@@ -64,7 +64,7 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 
 	order, err := h.svc.GetOrderByID(ctx, id)
 	if err != nil {
-		log.Printf("Failed to get order by id: %v", err)
+		log.Info().Msgf("Failed to get order by id: %v", err)
 		http.Error(w, "failed to get order", http.StatusInternalServerError)
 		return
 	}
@@ -77,7 +77,7 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(&order); err != nil {
-		log.Printf("Failed to encode response: %v", err)
+		log.Info().Msgf("Failed to encode response: %v", err)
 		http.Error(w, "invalid json", http.StatusInternalServerError)
 		return
 	}

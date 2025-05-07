@@ -3,13 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
 )
 
@@ -40,13 +40,13 @@ func New(cfg config.PostgresConfig) (*Postgres, error) {
 		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	log.Println("Connected to PostgreSQL")
+	log.Info().Msg("Connected to PostgreSQL")
 	return &Postgres{Pool: dbPool}, nil
 }
 
 func (p *Postgres) Close() {
 	p.Pool.Close()
-	log.Println("Database connection closed")
+	log.Info().Msg("Database connection closed")
 }
 
 func applyMigrations(dbPool *pgxpool.Pool, postgresCfg config.PostgresConfig) error {
@@ -77,13 +77,13 @@ func applyMigrations(dbPool *pgxpool.Pool, postgresCfg config.PostgresConfig) er
 
 	err = m.Up()
 	if err == migrate.ErrNoChange {
-		log.Println("No new migrations to apply")
+		log.Info().Msg("No new migrations to apply")
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
-	log.Println("New migrations applied successfully")
+	log.Info().Msg("New migrations applied successfully")
 
 	return nil
 }
