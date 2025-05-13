@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS order_service CASCADE;

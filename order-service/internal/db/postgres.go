@@ -18,7 +18,7 @@ type Postgres struct {
 }
 
 func New(cfg config.PostgresConfig) (*Postgres, error) {
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode)
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s search_path=order_service", cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode)
 
 	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
@@ -33,11 +33,6 @@ func New(cfg config.PostgresConfig) (*Postgres, error) {
 	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
-	}
-
-	err = applyMigrations(dbPool, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
 	log.Info().Msg("Connected to PostgreSQL")

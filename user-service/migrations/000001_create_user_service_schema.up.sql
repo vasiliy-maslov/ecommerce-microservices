@@ -1,3 +1,2 @@
 -- migrate:up transaction:false
-
-CREATE SCHEMA user_service;
+CREATE SCHEMA IF NOT EXISTS user_service;
