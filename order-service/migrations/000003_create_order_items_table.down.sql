@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS order_service.order_items;

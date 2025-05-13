@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/config"
 	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/db"
-	"github.com/vasiliy-maslov/ecommerce-microservices/order-service/internal/transport"
 )
 
 func main() {
@@ -35,11 +34,18 @@ func main() {
 	}
 	defer dbConn.Close()
 
-	r := transport.NewRouter(dbConn.Pool)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK")) // Игнорируем ошибку для простоты health check
+	})
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.App.Port,
-		Handler: r,
+		Addr:         ":" + cfg.App.Port,
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	go func() {
