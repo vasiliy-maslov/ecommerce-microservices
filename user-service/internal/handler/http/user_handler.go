@@ -125,7 +125,7 @@ func (h *UserHandler) handleGetUserByID(w http.ResponseWriter, r *http.Request) 
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Error().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
+		log.Warn().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
 	}
@@ -163,7 +163,7 @@ func (h *UserHandler) handleGetUserByID(w http.ResponseWriter, r *http.Request) 
 func (h *UserHandler) handleGetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	emailParam := chi.URLParam(r, "email")
 	if emailParam == "" {
-		log.Error().Msg("Failed to parse email from param")
+		log.Warn().Msg("Failed to parse email from param")
 		respondWithError(w, http.StatusBadRequest, "Email parameter cannot be empty")
 		return
 	}
