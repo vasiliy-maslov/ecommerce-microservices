@@ -67,7 +67,7 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	err := decoder.Decode(&requestPayload)
 	if err != nil {
-		log.Error().Err(err).Type("request_payload", requestPayload).Msg("Failed to decode request body")
+		log.Error().Err(err).Msg("Failed to decode request body")
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request payload %v", err))
 		return
 	}
@@ -93,7 +93,7 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	createdUser, err := h.service.CreateUser(r.Context(), &domainUser)
 	if err != nil {
-		log.Error().Err(err).Msg("ERROR: Failed to create user via service")
+		log.Error().Err(err).Msg("Failed to create user via service")
 
 		statusCode := mapErrorToStatusCode(err)
 
@@ -125,7 +125,7 @@ func (h *UserHandler) handleGetUserByID(w http.ResponseWriter, r *http.Request) 
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Warn().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
+		log.Warn().Err(err).Str("user_id", idParam).Msg("Failed to parse id parameter from URL")
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
 	}
@@ -202,7 +202,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Error().Err(err).Str("id_param_received", idParam).Msg("Failed to parse id parameter from URL")
+		log.Error().Err(err).Str("user_id", idParam).Msg("Failed to parse id parameter from URL")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return
@@ -214,7 +214,7 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&requestPayload)
 	if err != nil {
-		log.Error().Err(err).Type("request_payload", requestPayload).Msg("Failed to decode user")
+		log.Error().Err(err).Msg("Failed to decode user")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
@@ -270,7 +270,7 @@ func (h *UserHandler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	userID, err := uuid.FromString(idParam)
 	if err != nil {
-		log.Error().Err(err).Str("id_param", idParam).Msg("Failed to parse id parameter from URL")
+		log.Error().Err(err).Str("user_id", idParam).Msg("Failed to parse id parameter from URL")
 
 		respondWithError(w, http.StatusBadRequest, "Invalid id parameter")
 		return

@@ -76,7 +76,7 @@ func (r *repository) Create(ctx context.Context, user *User) (uuid.UUID, error) 
 			}
 		}
 
-		log.Error().Err(err).Str("created_id_received", user.ID.String()).Type("user_type", &user).Msg("Failed to create user and scan returned id")
+		log.Error().Err(err).Stringer("user_id", user.ID).Msg("Failed to create user and scan returned id")
 
 		return uuid.Nil, fmt.Errorf("failed to create user and scan returned id: %w", err)
 	}
@@ -114,7 +114,7 @@ func (r *repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 			return nil, ErrNotFound
 		}
 
-		log.Error().Err(err).Str("get_by_id_received", user.ID.String()).Msg("Failed to scan user by id")
+		log.Error().Err(err).Stringer("user_id", user.ID).Msg("Failed to scan user by id")
 
 		return nil, fmt.Errorf("failed to scan user by id %s: %w", id.String(), err)
 	}
@@ -152,7 +152,7 @@ func (r *repository) GetByEmail(ctx context.Context, email string) (*User, error
 			return nil, ErrNotFound
 		}
 
-		log.Error().Err(err).Str("get_by_email_received", user.ID.String()).Msg("Failed to scan user by email")
+		log.Error().Err(err).Stringer("user_id", user.ID).Msg("Failed to scan user by email")
 
 		return nil, fmt.Errorf("failed to scan user by email %s: %w", email, err)
 	}
@@ -189,7 +189,7 @@ func (r *repository) Update(ctx context.Context, user *User) error {
 			}
 		}
 
-		log.Error().Err(err).Str("update_user_id_received", user.ID.String()).Type("user_type", &user).Msg("Failed to update user")
+		log.Error().Err(err).Stringer("user_id", user.ID).Msg("Failed to update user")
 
 		return fmt.Errorf("failed to update user by id %s: %w", user.ID, err)
 	}
@@ -208,7 +208,7 @@ func (r *repository) Delete(ctx context.Context, id uuid.UUID) error {
 
 	tag, err := r.db.Exec(ctx, query, id)
 	if err != nil {
-		log.Error().Err(err).Str("delete_user_id_received", id.String()).Msg("Failed to delete user")
+		log.Error().Err(err).Str("user_id", id.String()).Msg("Failed to delete user")
 
 		return fmt.Errorf("failed to delete user by id %s: %w", id.String(), err)
 	}
