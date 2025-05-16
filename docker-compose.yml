@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
@@ -27,8 +28,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      # order-service-migrations:
-      #   condition: service_completed_successfully
+      order-service-migrations:
+        condition: service_completed_successfully
     environment:
       - APP_PORT=${APP_PORT}
       - DB_HOST=${DB_HOST}
@@ -71,25 +72,25 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # order-service-migrations:
-  #   build:
-  #     context: ./order-service
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - DB_HOST=${DB_HOST}
-  #     - DB_PORT=${DB_PORT}
-  #     - DB_USER=${DB_USER}
-  #     - DB_PASSWORD=${DB_PASSWORD}
-  #     - DB_NAME=${DB_NAME}
-  #     - DB_SSLMODE=${DB_SSLMODE}
-  #     - MIGRATIONS_PATH=${ORDER_MIGRATIONS_PATH}
-  #   volumes:
-  #     - ./order-service/migrations:${ORDER_MIGRATIONS_PATH}
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   command: [ "migrate", "-path", "${ORDER_MIGRATIONS_PATH}", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}", "up" ]
-  #   restart: no
+  order-service-migrations:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSLMODE=${DB_SSLMODE}
+      - MIGRATIONS_PATH=${ORDER_MIGRATIONS_PATH}
+    volumes:
+      - ./order-service/migrations:${ORDER_MIGRATIONS_PATH}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [ "migrate", "-path", "${ORDER_MIGRATIONS_PATH}", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&search_path=order_service", "up" ]
+    restart: no
 
   user-service-migrations:
     build:
@@ -108,7 +109,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: [ "migrate", "-path", "${USER_MIGRATIONS_PATH}", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}", "up" ]
+    command: [ "migrate", "-path", "${USER_MIGRATIONS_PATH}", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&search_path=user_service", "up" ]
     restart: no
 
 volumes:
