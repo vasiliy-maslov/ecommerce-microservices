@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
 	"github.com/vasiliy-maslov/ecommerce-microservices/user-service/internal/user"
 )
+
+type ValidationErrorResponse struct {
+	Error   string            `json:"error"`   // Общее сообщение
+	Details map[string]string `json:"details"` // Детали по полям
+}
 
 // respondWithError отправляет JSON ошибку
 func respondWithError(w http.ResponseWriter, code int, message string) {
@@ -48,10 +52,11 @@ func mapErrorToStatusCode(err error) int {
 	}
 }
 
-func formatValidationErrors(errs validator.ValidationErrors) string {
-	var messages []string
+func formatValidationErrors(errs validator.ValidationErrors) map[string]string {
+	errorDetails := make(map[string]string)
 	for _, err := range errs {
 		var msg string
+		field := err.Field()
 		switch err.Tag() {
 		case "required":
 			msg = fmt.Sprintf("Field '%s' is required", err.Field())
@@ -64,7 +69,7 @@ func formatValidationErrors(errs validator.ValidationErrors) string {
 			// Стандартное сообщение, если не знаем тег
 			msg = fmt.Sprintf("Field '%s' failed validation on '%s'", err.Field(), err.Tag())
 		}
-		messages = append(messages, msg)
+		errorDetails[field] = msg
 	}
-	return strings.Join(messages, "; ") // Объединяем все сообщения
+	return errorDetails
 }

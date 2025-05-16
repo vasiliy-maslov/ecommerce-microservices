@@ -76,7 +76,12 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		validationErrors, ok := err.(validator.ValidationErrors)
 		if ok {
-			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
+			details := formatValidationErrors(validationErrors)
+			errorResponse := ValidationErrorResponse{
+				Error:   "Validation failed",
+				Details: details,
+			}
+			respondWithJSON(w, http.StatusBadRequest, errorResponse)
 		} else {
 			log.Error().Err(err).Type("validation_error_type", err).Msg("Unexpected error type during validation")
 			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
@@ -224,7 +229,12 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		validationErrors, ok := err.(validator.ValidationErrors)
 		if ok {
-			respondWithError(w, http.StatusBadRequest, formatValidationErrors(validationErrors))
+			details := formatValidationErrors(validationErrors)
+			errorResponse := ValidationErrorResponse{
+				Error:   "Validation failed",
+				Details: details,
+			}
+			respondWithJSON(w, http.StatusBadRequest, errorResponse)
 		} else {
 			log.Error().Err(err).Type("validation_error_type", err).Msg("Unexpected error type during validation")
 			respondWithError(w, http.StatusInternalServerError, "Internal validation error")
