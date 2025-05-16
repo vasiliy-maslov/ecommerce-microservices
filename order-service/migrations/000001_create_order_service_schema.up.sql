@@ -1,3 +1,2 @@
 -- migrate:up transaction:false
-
-CREATE SCHEMA IF NOT EXISTS order_service;
+-- Схема user_service создается init-скриптом Docker
