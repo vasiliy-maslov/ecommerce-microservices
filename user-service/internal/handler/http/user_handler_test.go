@@ -195,17 +195,18 @@ func TestUserHandler_handleCreateUser_ValidationError(t *testing.T) {
 	router.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 
-	var errorResponse map[string]string
+	var errorResponse userHandler.ValidationErrorResponse
 	err = json.NewDecoder(rr.Body).Decode(&errorResponse)
 	require.NoError(t, err, "Failed to decode error response body for validation error test")
+	require.Equal(t, errorResponse.Error, "Validation failed")
 
-	actualErrorMessage, ok := errorResponse["error"]
-	require.True(t, ok, "Error response should contain an 'error' field")
+	errorDetails := errorResponse.Details
+	require.NotNil(t, errorDetails)
 
-	assert.Contains(t, actualErrorMessage, "Field 'FirstName' must be at least 2 characters long")
-	assert.Contains(t, actualErrorMessage, "Field 'LastName' is required")
-	assert.Contains(t, actualErrorMessage, "Field 'Email' must be a valid email address")
-	assert.Contains(t, actualErrorMessage, "Field 'Password' must be at least 8 characters long")
+	assert.Contains(t, errorDetails["FirstName"], "Field 'FirstName' must be at least 2 characters long")
+	assert.Contains(t, errorDetails["LastName"], "Field 'LastName' is required")
+	assert.Contains(t, errorDetails["Email"], "Field 'Email' must be a valid email address")
+	assert.Contains(t, errorDetails["Password"], "Field 'Password' must be at least 8 characters long")
 
 	mockService.AssertNotCalled(t, "CreateUser", mock.Anything, mock.AnythingOfType("*user.User"))
 }
@@ -262,16 +263,16 @@ func TestUserHandler_handleUpdateUser_ValidationError(t *testing.T) {
 	router.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 
-	var errorResponse map[string]string
+	var errorResponse userHandler.ValidationErrorResponse
 	err = json.NewDecoder(rr.Body).Decode(&errorResponse)
 	require.NoError(t, err, "Failed to decode error response body for validation error test")
 
-	actualErrorMessage, ok := errorResponse["error"]
-	require.True(t, ok, "Error response should contain an 'error' field")
+	require.Equal(t, errorResponse.Error, "Validation failed")
+	errorDetails := errorResponse.Details
 
-	assert.Contains(t, actualErrorMessage, "Field 'FirstName' must be at least 2 characters long")
-	assert.Contains(t, actualErrorMessage, "Field 'LastName' is required")
-	assert.Contains(t, actualErrorMessage, "Field 'Email' must be a valid email address")
+	assert.Contains(t, errorDetails["FirstName"], "Field 'FirstName' must be at least 2 characters long")
+	assert.Contains(t, errorDetails["LastName"], "Field 'LastName' is required")
+	assert.Contains(t, errorDetails["Email"], "Field 'Email' must be a valid email address")
 
 	mockService.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.AnythingOfType("*user.User"))
 }
