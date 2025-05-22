@@ -58,7 +58,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting HTTP server on port %s", cfg.App.Port)
+		log.Info().Msgf("Starting HTTP server on port %s", cfg.App.Port)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal().Err(err).Msgf("Could not listen on %s: %v\n", cfg.App.Port, err)
 		}
