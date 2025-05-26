@@ -33,74 +33,108 @@ func NewRepository(db *pgxpool.Pool) Repository {
 }
 
 func (r *postgresRepository) CreateOrder(ctx context.Context, orderInput *Order) (orderID uuid.UUID, err error) {
-	// Проверяем, что ID заказа был предоставлен (сгенерирован сервисом/тестом)
-	if orderInput.ID == uuid.Nil {
-		return uuid.Nil, fmt.Errorf("repository: order ID cannot be nil for CreateOrder")
+	finalOrderID := orderInput.ID // Используем ID из orderInput если он там есть (например, из тестов)
+	if finalOrderID == uuid.Nil { // Если ID не предоставлен (типичный случай от сервиса)
+		genID, genErr := uuid.NewV4()
+		if genErr != nil {
+			// Эта ошибка маловероятна с gofrs/uuid, но для полноты
+			log.Error().Err(genErr).Msg("repository: failed to generate order ID")
+			return uuid.Nil, fmt.Errorf("repository: failed to generate order ID: %w", genErr)
+		}
+		finalOrderID = genID
 	}
-	orderID = orderInput.ID // Используем ID из входных данных
+	// Записываем ID обратно в orderInput, чтобы вызывающий код (сервис) увидел его, если он был сгенерирован здесь.
+	// Хотя сервис все равно будет использовать возвращаемое значение orderID.
+	// Но если сервис передал orderInput дальше, это может быть полезно.
+	// ВАЖНО: orderInput - это указатель, так что это изменение будет видно вызывающему коду.
+	orderInput.ID = finalOrderID // Обновляем ID в исходном объекте
 
 	tx, beginErr := r.db.Begin(ctx)
 	if beginErr != nil {
+		// ... (логирование)
 		return uuid.Nil, fmt.Errorf("repository: failed to begin transaction: %w", beginErr)
 	}
+	// Используем defer с recover, как договорились
 	defer func() {
-		if p := recover(); p != nil { // Если была паника
-			_ = tx.Rollback(ctx)
-			panic(p) // Перепаниковать
-		} else if err != nil { // Если была ошибка (не паника)
-			log.Warn().Err(err).Stringer("order_id_attempted", orderID).Msg("Transaction for CreateOrder failed, rolling back")
+		if p := recover(); p != nil {
+			log.Error().Interface("panic_value", p).Stringer("order_id_attempted", finalOrderID).Msg("Panic recovered during CreateOrder, rolling back")
 			if rbErr := tx.Rollback(ctx); rbErr != nil {
-				log.Error().Err(rbErr).Stringer("order_id_attempted", orderID).Msg("Failed to rollback transaction")
+				log.Error().Err(rbErr).Stringer("order_id_attempted", finalOrderID).Msg("Failed to rollback transaction after panic")
 			}
-		} else { // Если не было ни паники, ни ошибки
+			panic(p) // Перепаниковать
+		} else if err != nil {
+			log.Warn().Err(err).Stringer("order_id_attempted", finalOrderID).Msg("Transaction for CreateOrder failed, rolling back")
+			if rbErr := tx.Rollback(ctx); rbErr != nil {
+				log.Error().Err(rbErr).Stringer("order_id_attempted", finalOrderID).Msg("Failed to rollback transaction")
+			}
+		} else {
 			if commitErr := tx.Commit(ctx); commitErr != nil {
-				log.Error().Err(commitErr).Stringer("order_id", orderID).Msg("Failed to commit transaction")
-				err = fmt.Errorf("repository: failed to commit transaction: %w", commitErr) // Устанавливаем ошибку
-				orderID = uuid.Nil                                                          // Сбрасываем, так как коммит не удался
+				log.Error().Err(commitErr).Stringer("order_id", finalOrderID).Msg("Failed to commit transaction")
+				err = fmt.Errorf("repository: failed to commit transaction: %w", commitErr)
+				// Не нужно сбрасывать finalOrderID, так как err != nil и defer это обработает
 			}
 		}
 	}()
 
 	// 1. Вставляем основной заказ
+	orderCreatedAt := time.Now().UTC()
+	orderUpdatedAt := orderCreatedAt // При создании равны
+
 	queryOrder := `
-		INSERT INTO order_service.orders (id, user_id, status, total_amount, shipping_address_text) 
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO order_service.orders (id, user_id, status, total_amount, shipping_address_text, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 	_, err = tx.Exec(ctx, queryOrder,
-		orderInput.ID,
+		finalOrderID,
 		orderInput.UserID,
-		string(orderInput.Status), // Преобразуем OrderStatus в string
+		string(orderInput.Status),
 		orderInput.TotalAmount,
 		orderInput.ShippingAddressText,
+		orderCreatedAt,
+		orderUpdatedAt,
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("repository: failed to insert order: %w", err)
 	}
+	// Обновляем orderInput с серверными значениями CreatedAt/UpdatedAt
+	orderInput.CreatedAt = orderCreatedAt
+	orderInput.UpdatedAt = orderUpdatedAt
 
 	// 2. Вставляем позиции заказа
-	for _, itemInput := range orderInput.OrderItems {
+	for i := range orderInput.OrderItems {
+		itemInput := &orderInput.OrderItems[i] // Работаем с указателем на элемент слайса
+
 		itemID, genErr := uuid.NewV4() // Генерируем ID для позиции здесь
 		if genErr != nil {
 			return uuid.Nil, fmt.Errorf("repository: failed to generate order item ID: %w", genErr)
 		}
+		itemInput.ID = itemID // Устанавливаем сгенерированный ID в объект
+
+		itemCreatedAt := time.Now().UTC()
+		itemUpdatedAt := itemCreatedAt
 
 		queryItem := `
-			INSERT INTO order_service.order_items (id, order_id, product_id, quantity, price_per_unit) 
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO order_service.order_items (id, order_id, product_id, quantity, price_per_unit, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 		`
 		_, err = tx.Exec(ctx, queryItem,
-			itemID,        // Сгенерированный ID позиции
-			orderInput.ID, // ID родительского заказа
+			itemInput.ID,
+			finalOrderID, // ID родительского заказа
 			itemInput.ProductID,
 			itemInput.Quantity,
 			itemInput.PricePerUnit,
+			itemCreatedAt,
+			itemUpdatedAt,
 		)
 		if err != nil {
-			return uuid.Nil, fmt.Errorf("repository: failed to insert order item for order %s: %w", orderInput.ID, err)
+			return uuid.Nil, fmt.Errorf("repository: failed to insert order item for order %s: %w", finalOrderID, err)
 		}
+		// Обновляем itemInput с серверными значениями
+		itemInput.CreatedAt = itemCreatedAt
+		itemInput.UpdatedAt = itemUpdatedAt
+		itemInput.OrderID = finalOrderID // Убедимся, что OrderID установлен в объекте OrderItem
 	}
-	// Если дошли сюда без ошибок, err будет nil, и defer вызовет Commit
-	return orderID, nil
+	return finalOrderID, nil // err будет nil если commit успешен
 }
 
 func (r *postgresRepository) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*Order, error) {

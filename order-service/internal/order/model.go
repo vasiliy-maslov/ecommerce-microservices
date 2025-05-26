@@ -17,6 +17,10 @@ const (
 	StatusCancelled  OrderStatus = "CANCELLED"
 )
 
+func (os OrderStatus) String() string {
+	return string(os)
+}
+
 type OrderItem struct {
 	ID           uuid.UUID `json:"id" db:"id"`
 	OrderID      uuid.UUID `json:"order_id" db:"order_id"`
